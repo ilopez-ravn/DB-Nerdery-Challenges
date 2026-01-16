@@ -119,12 +119,13 @@ LIMIT 5;
 ```
 SELECT 
     u.name, 
-    CAST((a.mount + SUM(
-        CASE m.type
-            WHEN 'IN' THEN m.mount
-            WHEN 'OUT' THEN -m.mount
-            WHEN 'TRANSFER' THEN -m.mount
-            WHEN 'OTHER' THEN -m.mount
+    CAST((SUM(a.mount) + SUM(
+        CASE
+            WHEN m.type = 'IN' THEN m.mount
+            WHEN m.type = 'OUT' THEN -m.mount
+            WHEN m.type = 'TRANSFER' AND m.account_from = a.id THEN -m.mount
+            WHEN m.type = 'TRANSFER' AND m.account_to = a.id THEN m.mount
+            WHEN m.type = 'OTHER' THEN -m.mount
         ELSE 
             0
         END
@@ -132,7 +133,7 @@ SELECT
 FROM accounts a
 JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
 JOIN users u ON u.id = a.user_id
-GROUP BY a.id, u.name
+GROUP BY a.user_id, u.name
 ORDER BY final_amount DESC 
 LIMIT 3;
 ```
@@ -154,7 +155,7 @@ LIMIT 3;
         u.name, 
         a.account_id,
         a.type, 
-        CAST ((a.mount + SUM(
+        CAST ((SUM(a.mount) + SUM(
             CASE
                 WHEN m.type = 'IN' THEN m.mount
                 WHEN m.type = 'OUT' THEN -m.mount
@@ -168,7 +169,7 @@ LIMIT 3;
     FROM accounts a
     JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
     JOIN users u ON u.id = a.user_id
-    GROUP BY a.id, u.name    
+    GROUP BY a.user_id, u.name    
     )
     SELECT 
         name, 
@@ -204,7 +205,7 @@ LIMIT 3;
     declare
         final_amount numeric(10,2);
     BEGIN
-        SELECT CAST ((a.mount + SUM(
+        SELECT CAST ((SUM(a.mount) + SUM(
             CASE
                 WHEN m.type = 'IN' THEN m.mount
                 WHEN m.type = 'OUT' THEN -m.mount
@@ -220,7 +221,7 @@ LIMIT 3;
         JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
         JOIN users u ON u.id = a.user_id
         WHERE a.id = CAST(s_account_id AS UUID)
-        GROUP BY a.id, u.name;
+        GROUP BY a.user_id, u.name;
 
         return final_amount;
     END;
@@ -311,7 +312,7 @@ WHERE a.id = '3b79e403-c788-495a-a8ca-86ad7643afaf';
 SELECT 
     u.name, 
     u.email, 
-    CAST((a.mount + SUM(
+    CAST((SUM(a.mount) + SUM(
         CASE
             WHEN m.type = 'IN' THEN m.mount
             WHEN m.type = 'OUT' THEN -m.mount
@@ -325,7 +326,7 @@ SELECT
 FROM accounts a
 JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
 JOIN users u ON u.id = a.user_id
-GROUP BY a.id, u.name, u.email
+GROUP BY a.user_id, u.name, u.email
 ORDER BY final_amount DESC 
 LIMIT 1;
 ```
