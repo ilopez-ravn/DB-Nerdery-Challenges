@@ -44,6 +44,7 @@ JOIN users u ON u.id = a.user_id
 GROUP BY a.user_id, u.name
 ORDER BY final_amount DESC 
 LIMIT 3;
+
 -- 5
 -- Function to get the final amount of an account after transactions
 DROP FUNCTION IF EXISTS get_account_final_amount(TEXT);
@@ -55,7 +56,7 @@ $$
 declare
     final_amount numeric(10,2);
 BEGIN
-    SELECT CAST ((SUM(a.mount) + SUM(
+    SELECT CAST ((a.mount + SUM(
         CASE
             WHEN m.type = 'IN' THEN m.mount
             WHEN m.type = 'OUT' THEN -m.mount
@@ -71,7 +72,7 @@ BEGIN
     JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
     JOIN users u ON u.id = a.user_id
     WHERE a.id = CAST(s_account_id AS UUID)
-    GROUP BY a.user_id, u.name;
+    GROUP BY a.id, u.name;
 
     return final_amount;
 END;
@@ -91,7 +92,7 @@ SELECT
     u.name, 
     a.account_id,
     a.type, 
-    CAST ((SUM(a.mount) + SUM(
+    CAST ((a.mount + SUM(
         CASE
             WHEN m.type = 'IN' THEN m.mount
             WHEN m.type = 'OUT' THEN -m.mount
@@ -105,7 +106,7 @@ SELECT
 FROM accounts a
 JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
 JOIN users u ON u.id = a.user_id
-GROUP BY a.user_id, u.name    
+GROUP BY a.id, u.name    
 )
 SELECT 
     name, 

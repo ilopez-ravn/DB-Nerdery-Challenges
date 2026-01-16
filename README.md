@@ -155,7 +155,7 @@ LIMIT 3;
         u.name, 
         a.account_id,
         a.type, 
-        CAST ((SUM(a.mount) + SUM(
+        CAST ((a.mount + SUM(
             CASE
                 WHEN m.type = 'IN' THEN m.mount
                 WHEN m.type = 'OUT' THEN -m.mount
@@ -169,7 +169,7 @@ LIMIT 3;
     FROM accounts a
     JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
     JOIN users u ON u.id = a.user_id
-    GROUP BY a.user_id, u.name    
+    GROUP BY a.id, u.name    
     )
     SELECT 
         name, 
@@ -205,7 +205,7 @@ LIMIT 3;
     declare
         final_amount numeric(10,2);
     BEGIN
-        SELECT CAST ((SUM(a.mount) + SUM(
+        SELECT CAST ((a.mount + SUM(
             CASE
                 WHEN m.type = 'IN' THEN m.mount
                 WHEN m.type = 'OUT' THEN -m.mount
@@ -221,10 +221,11 @@ LIMIT 3;
         JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
         JOIN users u ON u.id = a.user_id
         WHERE a.id = CAST(s_account_id AS UUID)
-        GROUP BY a.user_id, u.name;
+        GROUP BY a.id, u.name;
 
         return final_amount;
     END;
+    $$;
 
     -- Create a function that inserts the movements and 
     -- checks for sufficient funds and raise exception, if neccesary, triggering a rollback
