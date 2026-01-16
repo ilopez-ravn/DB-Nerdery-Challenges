@@ -79,7 +79,9 @@ Now it's your turn to write SQL queries to achieve the following results (You ne
 1. Total money of all the accounts group by types.
 
 ```
-SELECT type AS Account_yype, CAST(SUM(mount) AS numeric(10,2)) AS total_amount 
+SELECT 
+    type AS Account_type, 
+    CAST(SUM(mount) AS numeric(10,2)) AS total_amount 
 FROM accounts 
 GROUP BY type;
 ```
@@ -88,7 +90,8 @@ GROUP BY type;
 2. How many users with at least 2 `CURRENT_ACCOUNT`.
 
 ```
-SELECT COUNT(a.id) AS users_count 
+SELECT 
+    COUNT(a.id) AS users_count 
 FROM users u
 JOIN accounts a ON u.id = a.user_id
 WHERE a.type = 'CURRENT_ACCOUNT'
@@ -100,7 +103,10 @@ HAVING COUNT(a.id) >= 2;
 3. List the top five accounts with more money.
 
 ```
-SELECT u.name, a.type, a.mount AS amount 
+SELECT 
+    u.name, 
+    a.type, 
+    a.mount AS amount 
 FROM accounts a
 JOIN users u ON u.id = a.user_id
 ORDER BY a.mount DESC 
@@ -111,16 +117,18 @@ LIMIT 5;
 4. Get the three users with the most money after making movements.
 
 ```
-SELECT u.name, CAST((a.mount + SUM(
-    CASE m.type
-        WHEN 'IN' THEN m.mount
-        WHEN 'OUT' THEN -m.mount
-        WHEN 'TRANSFER' THEN -m.mount
-        WHEN 'OTHER' THEN -m.mount
-    ELSE 
-        0
-    END
-)) AS numeric(10,2)) AS final_amount
+SELECT 
+    u.name, 
+    CAST((a.mount + SUM(
+        CASE m.type
+            WHEN 'IN' THEN m.mount
+            WHEN 'OUT' THEN -m.mount
+            WHEN 'TRANSFER' THEN -m.mount
+            WHEN 'OTHER' THEN -m.mount
+        ELSE 
+            0
+        END
+    )) AS numeric(10,2)) AS final_amount
 FROM accounts a
 JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
 JOIN users u ON u.id = a.user_id
@@ -134,21 +142,41 @@ LIMIT 3;
 
     a. First, get the ammount for the account `3b79e403-c788-495a-a8ca-86ad7643afaf` and `fd244313-36e5-4a17-a27c-f8265bc46590` after all their movements.
     ```
-    SELECT u.name, a.account_id ,a.type, CAST ((a.mount + SUM(
-        CASE m.type
-            WHEN 'IN' THEN m.mount
-            WHEN 'OUT' THEN -m.mount
-            WHEN 'TRANSFER' THEN -m.mount
-            WHEN 'OTHER' THEN -m.mount
-        ELSE 
-            0
-        END
-    )) AS numeric(10,2) ) AS final_amount
+
+    -- Running this query will give the same result but without knowing to which user is linked:
+    -- SELECT get_account_final_amount('3b79e403-c788-495a-a8ca-86ad7643afaf')
+    -- UNION
+    -- SELECT get_account_final_amount('fd244313-36e5-4a17-a27c-f8265bc46590');
+
+    WITH get_final_amount AS (
+    SELECT 
+        a.id, 
+        u.name, 
+        a.account_id,
+        a.type, 
+        CAST ((a.mount + SUM(
+            CASE
+                WHEN m.type = 'IN' THEN m.mount
+                WHEN m.type = 'OUT' THEN -m.mount
+                WHEN m.type = 'TRANSFER' AND m.account_from = a.id THEN -m.mount
+                WHEN m.type = 'TRANSFER' AND m.account_to = a.id THEN m.mount
+                WHEN m.type = 'OTHER' THEN -m.mount
+            ELSE 
+                0
+            END
+        )) AS numeric(10,2) ) AS final_amount
     FROM accounts a
     JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
     JOIN users u ON u.id = a.user_id
-    WHERE a.id IN ('3b79e403-c788-495a-a8ca-86ad7643afaf','fd244313-36e5-4a17-a27c-f8265bc46590')
-    GROUP BY a.id, u.name
+    GROUP BY a.id, u.name    
+    )
+    SELECT 
+        name, 
+        account_id, 
+        type, 
+        final_amount
+    FROM get_final_amount 
+    WHERE id IN ('3b79e403-c788-495a-a8ca-86ad7643afaf','fd244313-36e5-4a17-a27c-f8265bc46590')
     ORDER BY final_amount DESC;
     ```
     
@@ -158,7 +186,6 @@ LIMIT 3;
     ```
     INSERT INTO movements (id, type, account_from, account_to, mount)
     VALUES (gen_random_uuid(), 'TRANSFER', '3b79e403-c788-495a-a8ca-86ad7643afaf', 'fd244313-36e5-4a17-a27c-f8265bc46590', 50.75);
-
     ```
 
     c. Add a new movement with the information:
@@ -167,8 +194,6 @@ LIMIT 3;
         mount: 731823.56
 
         * Note: if the account does not have enough money you need to reject this insert and make a rollback for the entire transaction
-    
-    d. Put your answer here if the transaction fails(YES/NO):
     ```
     DROP FUNCTION IF EXISTS get_account_final_amount(TEXT);
     CREATE OR REPLACE FUNCTION get_account_final_amount(s_account_id TEXT) 
@@ -180,11 +205,12 @@ LIMIT 3;
         final_amount numeric(10,2);
     BEGIN
         SELECT CAST ((a.mount + SUM(
-            CASE m.type
-                WHEN 'IN' THEN m.mount
-                WHEN 'OUT' THEN -m.mount
-                WHEN 'TRANSFER' THEN -m.mount
-                WHEN 'OTHER' THEN -m.mount
+            CASE
+                WHEN m.type = 'IN' THEN m.mount
+                WHEN m.type = 'OUT' THEN -m.mount
+                WHEN m.type = 'TRANSFER' AND m.account_from = a.id THEN -m.mount
+                WHEN m.type = 'TRANSFER' AND m.account_to = a.id THEN m.mount
+                WHEN m.type = 'OTHER' THEN -m.mount
             ELSE 
                 0
             END
@@ -198,8 +224,9 @@ LIMIT 3;
 
         return final_amount;
     END;
-    $$;
 
+    -- Create a function that inserts the movements and 
+    -- checks for sufficient funds and raise exception, if neccesary, triggering a rollback
     do $$
     DECLARE 
     final_amount numeric(10,2);
@@ -212,16 +239,43 @@ LIMIT 3;
     INTO final_amount;  
 
     IF final_amount < 0 THEN
-        RAISE EXCEPTION 'INSUFFICIENT FUNDS';
+        RAISE EXCEPTION 'INSUFFICIENT FUNDS'; -- This will trigger a rollback
     END IF;
     END
     $$;
-    COMMIT;
+    ```
+    
+    d. Put your answer here if the transaction fails(YES/NO):
+    ```
+    YES
     ```
 
     e. If the transaction fails, make the correction on step _c_ to avoid the failure:
     ```
-        Your query
+    do $$
+        DECLARE 
+        final_amount numeric(10,2);
+        initial_amount numeric(10,2);
+        BEGIN
+        SELECT get_account_final_amount('3b79e403-c788-495a-a8ca-86ad7643afaf') 
+        INTO initial_amount;  
+
+        -- Pre check if there is sufficient funds
+        IF initial_amount - 731823.56 < 0 THEN
+            -- Leave the account at 0 balance
+            INSERT INTO movements (id, type, account_from, mount)
+            VALUES (gen_random_uuid() ,'OUT', '3b79e403-c788-495a-a8ca-86ad7643afaf', initial_amount);
+        ELSE
+            INSERT INTO movements (id, type, account_from, mount)
+            VALUES (gen_random_uuid() ,'OUT', '3b79e403-c788-495a-a8ca-86ad7643afaf', 731823.56);
+        END IF;
+
+
+        SELECT get_account_final_amount('3b79e403-c788-495a-a8ca-86ad7643afaf') 
+        INTO final_amount;  
+
+        END
+    $$;
     ```
 
     f. Once the transaction is correct, make a commit
@@ -229,7 +283,7 @@ LIMIT 3;
     COMMIT;
     ```
 
-    e. How much money the account `fd244313-36e5-4a17-a27c-f8265bc46590` have:
+    g. How much money the account `fd244313-36e5-4a17-a27c-f8265bc46590` have:
     ```
     SELECT get_account_final_amount('fd244313-36e5-4a17-a27c-f8265bc46590') as final_amount; 
     ```
@@ -238,28 +292,36 @@ LIMIT 3;
 6. All the movements and the user information with the account `3b79e403-c788-495a-a8ca-86ad7643afaf`
 
 ```
-SELECT u.name || ' ' || u.last_name AS name, u.email, a.account_id,m.type AS transfer_type, m.mount as movement
+SELECT 
+    u.name || ' ' || u.last_name AS name, 
+    u.email, 
+    a.account_id, 
+    m.type AS transfer_type, 
+    m.mount as movement
 FROM accounts a
 JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
 JOIN users u ON u.id = a.user_id
 WHERE a.id = '3b79e403-c788-495a-a8ca-86ad7643afaf';
-
 ```
 
 
 7. The name and email of the user with the highest money in all his/her accounts
 
 ```
-SELECT u.name, u.email, CAST((a.mount + SUM(
-    CASE m.type
-        WHEN 'IN' THEN m.mount
-        WHEN 'OUT' THEN -m.mount
-        WHEN 'TRANSFER' THEN -m.mount
-        WHEN 'OTHER' THEN -m.mount
-    ELSE 
-        0
-    END
-)) AS numeric(10,2)) AS final_amount
+SELECT 
+    u.name, 
+    u.email, 
+    CAST((a.mount + SUM(
+        CASE
+            WHEN m.type = 'IN' THEN m.mount
+            WHEN m.type = 'OUT' THEN -m.mount
+            WHEN m.type = 'TRANSFER' AND m.account_from = a.id THEN -m.mount
+            WHEN m.type = 'TRANSFER' AND m.account_to = a.id THEN m.mount
+            WHEN m.type = 'OTHER' THEN -m.mount
+        ELSE 
+            0
+        END
+    )) AS numeric(10,2)) AS final_amount
 FROM accounts a
 JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
 JOIN users u ON u.id = a.user_id
@@ -272,7 +334,11 @@ LIMIT 1;
 8. Show all the movements for the user `Kaden.Gusikowski@gmail.com` order by account type and created_at on the movements table
 
 ```
-SELECT m.type AS movement_type, m.account_from, m.account_to, m.mount AS movement_amount
+SELECT 
+    m.type AS movement_type, 
+    m.account_from, 
+    m.account_to, 
+    m.mount AS movement_amount
 FROM users u
 JOIN accounts a ON a.user_id = u.id
 JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
