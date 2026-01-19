@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS warehouse_kardex (
     change_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     changed_by INT REFERENCES sys_user(id) ON DELETE SET NULL,
     notes TEXT
-)
+);
 
 
 
@@ -148,6 +148,7 @@ CREATE TABLE IF NOT EXISTS sales (
     id SERIAL PRIMARY KEY,
     client_id INT REFERENCES client(id) ON DELETE CASCADE,
     address_id INT REFERENCES client_address(id) ON DELETE SET NULL,
+    warehouse_id INT REFERENCES warehouse(id) ON DELETE SET NULL,
     
     tax_percent INT NOT NULL DEFAULT 18,
     total_amount DECIMAL(10, 2) NOT NULL,
