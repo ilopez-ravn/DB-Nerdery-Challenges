@@ -74,7 +74,12 @@ Now it's your turn to write SQL querys to achieve the following results:
 1. Count the total number of states in each country.
 
 ```
-SELECT c.name, COUNT(c.id) from countries c JOIN states s ON c.id = s.country_id GROUP BY c.id ORDER BY COUNT(c.id) DESC;
+SELECT 
+    c.name, 
+    COUNT(*) 
+FROM states s 
+JOIN countries c ON c.id = s.country_id  
+GROUP BY s.country_id, c.name;
 ```
 
 <p align="center">
@@ -84,7 +89,10 @@ SELECT c.name, COUNT(c.id) from countries c JOIN states s ON c.id = s.country_id
 2. How many employees do not have supervisores.
 
 ```
-SELECT COUNT(id) AS employees_without_bosses from employees WHERE supervisor_id IS NULL;
+SELECT 
+    COUNT(*) AS employees_without_bosses 
+FROM employees 
+WHERE supervisor_id IS NULL;
 ```
 
 <p align="center">
@@ -94,7 +102,15 @@ SELECT COUNT(id) AS employees_without_bosses from employees WHERE supervisor_id 
 3. List the top five offices address with the most amount of employees, order the result by country and display a column with a counter.
 
 ```
-SELECT c.name, o.address, COUNT(c.id) from offices o JOIN employees e ON o.id = e.office_id JOIN countries c ON o.country_id = c.id GROUP BY o.id, c.id ORDER BY COUNT(e.id) DESC LIMIT 5;
+SELECT 
+    c.name, 
+    o.address, 
+    COUNT(*) from offices o 
+JOIN employees e ON o.id = e.office_id 
+JOIN countries c ON o.country_id = c.id 
+GROUP BY o.id, c.name
+ORDER BY COUNT(*) DESC 
+LIMIT 5;
 ```
 
 <p align="center">
@@ -104,7 +120,14 @@ SELECT c.name, o.address, COUNT(c.id) from offices o JOIN employees e ON o.id = 
 4. Three supervisors with the most amount of employees they are in charge.
 
 ```
-SELECT supervisor_id, COUNT(id) FROM employees WHERE supervisor_id IS NOT NULL GROUP BY supervisor_id ORDER BY COUNT(id) DESC LIMIT 3;
+SELECT 
+    supervisor_id, 
+    COUNT(*) 
+FROM employees 
+WHERE supervisor_id IS NOT NULL 
+GROUP BY supervisor_id 
+ORDER BY COUNT(*) DESC 
+LIMIT 3;
 ```
 
 <p align="center">
@@ -114,7 +137,14 @@ SELECT supervisor_id, COUNT(id) FROM employees WHERE supervisor_id IS NOT NULL G
 5. How many offices are in the state of Colorado (United States).
 
 ```
-SELECT COUNT(id) AS list_of_office FROM offices WHERE state_id = (SELECT id FROM states WHERE name ILIKE 'colorado');
+SELECT 
+    COUNT(*) AS list_of_office 
+FROM offices 
+WHERE state_id = (
+    SELECT id 
+    FROM states 
+    WHERE name ILIKE 'colorado'
+);
 ```
 
 <p align="center">
@@ -124,7 +154,13 @@ SELECT COUNT(id) AS list_of_office FROM offices WHERE state_id = (SELECT id FROM
 6. The name of the office with its number of employees ordered in a desc.
 
 ```
-SELECT o.name, COUNT(o.id) AS count FROM offices o JOIN employees e ON o.id = e.office_id GROUP BY o.name ORDER BY COUNT(o.id) DESC, o.name ASC;
+SELECT 
+    o.name, 
+    COUNT(*) AS count 
+FROM offices o 
+JOIN employees e ON o.id = e.office_id 
+GROUP BY o.name 
+ORDER BY COUNT(*) DESC;
 ```
 
 <p align="center">
@@ -135,15 +171,14 @@ SELECT o.name, COUNT(o.id) AS count FROM offices o JOIN employees e ON o.id = e.
 
 ```
 WITH EmployeeCount AS (
-    SELECT address, COUNT(address) AS count
+    SELECT address, COUNT(*) AS count
     FROM offices o 
     JOIN employees e ON o.id = e.office_id 
     GROUP BY address
-    ORDER BY COUNT(address)
 )
 (SELECT * FROM EmployeeCount ORDER BY count DESC LIMIT 1)
 UNION
-(SELECT * FROM EmployeeCount LIMIT 1);
+(SELECT * FROM EmployeeCount ORDER BY count ASC LIMIT 1);
 ```
 
 <p align="center">
@@ -165,8 +200,7 @@ FROM employees e
 JOIN offices o ON o.id = e.office_id
 JOIN countries c ON c.id = o.country_id
 JOIN states s ON s.id = o.state_id
-LEFT JOIN employees sup ON e.supervisor_id = sup.id
-ORDER BY full_name;
+RIGHT JOIN employees sup ON e.supervisor_id = sup.id;
 ```
 
 <p align="center">
