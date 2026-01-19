@@ -119,19 +119,23 @@ LIMIT 5;
 ```
 SELECT 
     u.name, 
-    CAST((SUM(a.mount) + SUM(
+    CAST((SUM(a.mount) + (
+        SELECT SUM(
         CASE
             WHEN m.type = 'IN' THEN m.mount
             WHEN m.type = 'OUT' THEN -m.mount
-            WHEN m.type = 'TRANSFER' AND m.account_from = a.id THEN -m.mount
-            WHEN m.type = 'TRANSFER' AND m.account_to = a.id THEN m.mount
+            WHEN m.type = 'TRANSFER' AND m.account_from = sub_a.id THEN -m.mount
+            WHEN m.type = 'TRANSFER' AND m.account_to = sub_a.id THEN m.mount
             WHEN m.type = 'OTHER' THEN -m.mount
         ELSE 
             0
         END
-    )) AS numeric(10,2)) AS final_amount
+    ) 
+    FROM movements m
+    JOIN accounts sub_a ON m.account_from = sub_a.id OR m.account_to = sub_a.id
+    WHERE sub_a.user_id = a.user_id
+    ) ) AS numeric(10,2)) AS final_amount
 FROM accounts a
-JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
 JOIN users u ON u.id = a.user_id
 GROUP BY a.user_id, u.name
 ORDER BY final_amount DESC 
@@ -149,34 +153,34 @@ LIMIT 3;
     -- UNION
     -- SELECT get_account_final_amount('fd244313-36e5-4a17-a27c-f8265bc46590');
 
-    WITH get_final_amount AS (
-    SELECT 
-        a.id, 
-        u.name, 
-        a.account_id,
-        a.type, 
-        CAST ((a.mount + SUM(
-            CASE
-                WHEN m.type = 'IN' THEN m.mount
-                WHEN m.type = 'OUT' THEN -m.mount
-                WHEN m.type = 'TRANSFER' AND m.account_from = a.id THEN -m.mount
-                WHEN m.type = 'TRANSFER' AND m.account_to = a.id THEN m.mount
-                WHEN m.type = 'OTHER' THEN -m.mount
-            ELSE 
-                0
-            END
-        )) AS numeric(10,2) ) AS final_amount
-    FROM accounts a
-    JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
-    JOIN users u ON u.id = a.user_id
-    GROUP BY a.id, u.name    
+    WITH account_after_movs AS (
+        SELECT 
+            a.id, 
+            u.name, 
+            a.account_id,
+            a.type, 
+            CAST ((a.mount + SUM(
+                CASE
+                    WHEN m.type = 'IN' THEN m.mount
+                    WHEN m.type = 'OUT' THEN -m.mount
+                    WHEN m.type = 'TRANSFER' AND m.account_from = a.id THEN -m.mount
+                    WHEN m.type = 'TRANSFER' AND m.account_to = a.id THEN m.mount
+                    WHEN m.type = 'OTHER' THEN -m.mount
+                ELSE 
+                    0
+                END
+            )) AS numeric(10,2) ) AS final_amount
+        FROM accounts a
+        JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
+        JOIN users u ON u.id = a.user_id
+        GROUP BY a.id, u.name
     )
     SELECT 
         name, 
         account_id, 
         type, 
         final_amount
-    FROM get_final_amount 
+    FROM account_after_movs 
     WHERE id IN ('3b79e403-c788-495a-a8ca-86ad7643afaf','fd244313-36e5-4a17-a27c-f8265bc46590')
     ORDER BY final_amount DESC;
     ```
@@ -313,19 +317,23 @@ WHERE a.id = '3b79e403-c788-495a-a8ca-86ad7643afaf';
 SELECT 
     u.name, 
     u.email, 
-    CAST((SUM(a.mount) + SUM(
+    CAST((SUM(a.mount) + (
+        SELECT SUM(
         CASE
             WHEN m.type = 'IN' THEN m.mount
             WHEN m.type = 'OUT' THEN -m.mount
-            WHEN m.type = 'TRANSFER' AND m.account_from = a.id THEN -m.mount
-            WHEN m.type = 'TRANSFER' AND m.account_to = a.id THEN m.mount
+            WHEN m.type = 'TRANSFER' AND m.account_from = sub_a.id THEN -m.mount
+            WHEN m.type = 'TRANSFER' AND m.account_to = sub_a.id THEN m.mount
             WHEN m.type = 'OTHER' THEN -m.mount
         ELSE 
             0
         END
-    )) AS numeric(10,2)) AS final_amount
+    ) 
+    FROM movements m
+    JOIN accounts sub_a ON m.account_from = sub_a.id OR m.account_to = sub_a.id
+    WHERE sub_a.user_id = a.user_id
+    ) ) AS numeric(10,2)) AS final_amount
 FROM accounts a
-JOIN movements m ON m.account_from = a.id OR m.account_to = a.id
 JOIN users u ON u.id = a.user_id
 GROUP BY a.user_id, u.name, u.email
 ORDER BY final_amount DESC 
