@@ -148,7 +148,9 @@ CREATE TABLE IF NOT EXISTS client (
     phone VARCHAR(20),
     document VARCHAR(50) UNIQUE NOT NULL,
     document_type VARCHAR(50) NOT NULL,
+
     
+    google_id VARCHAR(255) UNIQUE,
     user_id INT REFERENCES sys_user(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -305,8 +307,15 @@ CREATE TABLE IF NOT EXISTS password_recovery_token (
 -- We can later add product variants and better audit logging 
 
 -- INDEXES
-CREATE INDEX idx_product_category ON product(category_id, is_active);
-CREATE INDEX idx_product_tag ON product(tag_id, is_active);
+CREATE INDEX idx_active_product_category ON product(category_id, is_active);
+CREATE INDEX idx_active_product_tag ON product(tag_id, is_active);
+CREATE INDEX idx_active_shopping_cart_details ON shopping_cart_details(cart_id, is_active);
+CREATE INDEX idx_active_product_shopping_cart_details ON shopping_cart_details(cart_id, product_id, is_active);
+CREATE INDEX idx_active_sales_client ON sales(is_active, client_id);
+CREATE INDEX idx_document_type_sales_bill ON sales_bill(document_type, is_active);
+CREATE INDEX idx_document_number_sales_bill ON sales_bill(sale_id, document_number);
+CREATE INDEX idx_carrier_delivery_tracking ON delivery_tracking(carrier_id, status);
+CREATE INDEX idx_status_delivery_tracking ON delivery_tracking(status);
 
 
 -- VIEWS
