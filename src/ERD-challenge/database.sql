@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS sys_user (
     password TEXT NOT NULL,
     role_id INT REFERENCES user_role(id) ON DELETE RESTRICT,
 
-    
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_updated_password TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -308,7 +307,6 @@ CREATE TABLE IF NOT EXISTS password_recovery_token (
 
 -- INDEXES
 CREATE INDEX idx_active_product_category ON product(category_id, is_active);
-CREATE INDEX idx_active_product_tag ON product(tag_id, is_active);
 CREATE INDEX idx_active_shopping_cart_details ON shopping_cart_details(cart_id, is_active);
 CREATE INDEX idx_active_product_shopping_cart_details ON shopping_cart_details(cart_id, product_id, is_active);
 CREATE INDEX idx_active_sales_client ON sales(is_active, client_id);
