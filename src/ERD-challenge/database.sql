@@ -316,8 +316,3 @@ CREATE INDEX idx_document_type_sales_bill ON sales_bill(document_type, is_active
 CREATE INDEX idx_document_number_sales_bill ON sales_bill(sale_id, document_number);
 CREATE INDEX idx_carrier_delivery_tracking ON delivery_tracking(carrier_id, status);
 CREATE INDEX idx_status_delivery_tracking ON delivery_tracking(status);
-
-
--- VIEWS
-
--- TRIGGERS
