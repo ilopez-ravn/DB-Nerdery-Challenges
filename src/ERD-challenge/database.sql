@@ -314,3 +314,49 @@ CREATE INDEX idx_document_type_sales_bill ON sales_bill(document_type, is_active
 CREATE INDEX idx_document_number_sales_bill ON sales_bill(sale_id, document_number);
 CREATE INDEX idx_carrier_delivery_tracking ON delivery_tracking(carrier_id, status);
 CREATE INDEX idx_status_delivery_tracking ON delivery_tracking(status);
+
+
+-- TRIGGERS
+
+-- Create a register of product_stock for all warehouses when a new product is added
+CREATE OR REPLACE FUNCTION create_warehouse_stock_for_new_product()
+    RETURNS TRIGGER 
+    LANGUAGE PLPGSQL
+AS $$
+BEGIN
+    INSERT INTO product_stock (product_id, warehouse_id, quantity, last_updated)
+    SELECT NEW.id, w.id, 0, CURRENT_TIMESTAMP
+    FROM warehouse w;
+    RETURN NEW;
+END;
+$$
+
+CREATE TRIGGER trigger_create_warehouse_stock
+AFTER INSERT 
+ON product
+FOR EACH ROW
+EXECUTE PROCEDURE create_warehouse_stock_for_new_product();
+
+
+
+-- Create a register of product_stock for all products when a new warehouse is added 
+CREATE OR REPLACE FUNCTION create_warehouse_stock_for_new_warehouse()
+    RETURNS TRIGGER 
+    LANGUAGE PLPGSQL
+AS $$
+BEGIN
+    INSERT INTO product_stock (product_id, warehouse_id, quantity, last_updated)
+    SELECT p.id, NEW.id, 0, CURRENT_TIMESTAMP
+    FROM product p;
+    RETURN NEW;
+END;
+$$
+
+CREATE TRIGGER trigger_create_product_stock
+AFTER INSERT 
+ON warehouse
+FOR EACH ROW
+EXECUTE PROCEDURE create_warehouse_stock_for_new_warehouse();
+
+
+
