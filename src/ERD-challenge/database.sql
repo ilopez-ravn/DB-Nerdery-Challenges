@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS product_stock (
     product_id INT REFERENCES product(id) ON DELETE CASCADE,
     warehouse_id INT REFERENCES warehouse(id) ON DELETE CASCADE,
 
-    quantity INT NOT NULL,
+    quantity INT NOT NULL CHECK (quantity >= 0),
 
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -126,8 +126,8 @@ CREATE TABLE IF NOT EXISTS warehouse_kardex (
     warehouse_id INT REFERENCES warehouse(id) ON DELETE SET NULL,
 
     change_type VARCHAR(50) NOT NULL,
-    reference_id INT, -- Keeps track of the related id (sale_id, purchase_id, adjustment_id, etc)
-    quantity INT NOT NULL,
+    reference_id INT, -- Keeps track of the related id (order_id, purchase_id, adjustment_id, etc)
+    quantity INT NOT NULL CHECK (quantity >= 0),
     notes TEXT,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS client_address (
 );
 
 
--- SALES DATA
+-- ORDER DATA
 
 CREATE TABLE IF NOT EXISTS shopping_cart (
     id SERIAL PRIMARY KEY,
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS shopping_cart_details (
     cart_id INT REFERENCES shopping_cart(id) ON DELETE CASCADE,
     product_id INT REFERENCES product(id) ON DELETE CASCADE,
     price DECIMAL(10, 2) NOT NULL,
-    quantity INT NOT NULL,
+    quantity INT NOT NULL CHECK (quantity >= 0),
     total DECIMAL(10, 2) GENERATED ALWAYS AS (price * quantity) STORED,
     is_active BOOLEAN DEFAULT TRUE,
 
@@ -199,19 +199,19 @@ CREATE TABLE IF NOT EXISTS product_liked (
     liked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS sales (
+CREATE TABLE IF NOT EXISTS order (
     id SERIAL PRIMARY KEY,
     client_id INT REFERENCES client(id) ON DELETE CASCADE,
     shopping_cart_id INT REFERENCES shopping_cart(id) ON DELETE SET NULL,
     warehouse_id INT REFERENCES warehouse(id) ON DELETE SET NULL,
     
-    sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
-CREATE TABLE IF NOT EXISTS sales_bill (
+CREATE TABLE IF NOT EXISTS order_bill (
     id SERIAL PRIMARY KEY,
-    sale_id INT REFERENCES sales(id) ON DELETE CASCADE NOT NULL,
+    order_id INT REFERENCES order(id) ON DELETE CASCADE NOT NULL,
 
     document_type VARCHAR(50) NOT NULL,
     document_number VARCHAR(100) UNIQUE NOT NULL,
@@ -224,25 +224,44 @@ CREATE TABLE IF NOT EXISTS sales_bill (
     issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS sales_details (
+CREATE TABLE IF NOT EXISTS order_details (
     id SERIAL PRIMARY KEY,
-    sale_id INT REFERENCES sales(id) ON DELETE CASCADE,
+    order_id INT REFERENCES order(id) ON DELETE CASCADE,
     product_id INT REFERENCES product(id) ON DELETE CASCADE,
     price DECIMAL(10, 2) NOT NULL,
-    quantity INT NOT NULL,
+    quantity INT NOT NULL CHECK (quantity >= 0),
     tax_percent INT NOT NULL DEFAULT 18,
     total_amount DECIMAL(10, 2) GENERATED ALWAYS AS (price * quantity) STORED,
     tax_amount DECIMAL(10, 2) NOT NULL GENERATED ALWAYS AS ( (price * quantity) - ((price * quantity) / 1.18)) STORED
 );
 
-CREATE TABLE IF NOT EXISTS stripe_payment_information (
+CREATE TABLE IF NOT EXISTS stripe_payment (
     id SERIAL PRIMARY KEY,
-    sale_id INT REFERENCES sales(id) ON DELETE CASCADE,
+    order_id INT REFERENCES order(id) ON DELETE CASCADE,
     stripe_payment_id VARCHAR(255) UNIQUE NOT NULL,
     payment_type VARCHAR(50) NOT NULL,
     amount DECIMAL(10, 2) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     payment_status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stripe_customer_payment_method (
+    id SERIAL PRIMARY KEY,
+    client_id INT REFERENCES client(id) ON DELETE CASCADE,
+    stripe_customer_id VARCHAR(255) NOT NULL,
+    stripe_payment_method_id VARCHAR(255) UNIQUE NOT NULL,
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stripe_payment_event_log (
+    id SERIAL PRIMARY KEY,
+    payment_id INT REFERENCES stripe_payment(id) ON DELETE CASCADE,
+    event_type VARCHAR(50) NOT NULL,
+    previous_status VARCHAR(50),
+    new_status VARCHAR(50),
+    event_data JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -255,7 +274,7 @@ CREAte TABLE IF NOT EXISTS carrier (
 
 CREATE TABLE IF NOT EXISTS delivery_tracking (
     id SERIAL PRIMARY KEY,
-    sale_id INT REFERENCES sales(id) ON DELETE CASCADE,
+    order_id INT REFERENCES order(id) ON DELETE CASCADE,
     address_id INT REFERENCES client_address(id) ON DELETE SET NULL,
     tracking_number VARCHAR(100) UNIQUE NOT NULL,
     carrier_id INT REFERENCES carrier(id) ON DELETE SET NULL,
@@ -268,7 +287,7 @@ CREATE TABLE IF NOT EXISTS delivery_tracking (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS sale_tracking_log (
+CREATE TABLE IF NOT EXISTS order_tracking_log (
     id SERIAL PRIMARY KEY,
     delivery_tracking_id INT REFERENCES delivery_tracking(id) ON DELETE CASCADE,
     previous_status VARCHAR(50) NOT NULL,
@@ -309,9 +328,9 @@ CREATE TABLE IF NOT EXISTS password_recovery_token (
 CREATE INDEX idx_active_product_category ON product(category_id, is_active);
 CREATE INDEX idx_active_shopping_cart_details ON shopping_cart_details(cart_id, is_active);
 CREATE INDEX idx_active_product_shopping_cart_details ON shopping_cart_details(cart_id, product_id, is_active);
-CREATE INDEX idx_active_sales_client ON sales(is_active, client_id);
-CREATE INDEX idx_document_type_sales_bill ON sales_bill(document_type, is_active);
-CREATE INDEX idx_document_number_sales_bill ON sales_bill(sale_id, document_number);
+CREATE INDEX idx_active_order_client ON order(is_active, client_id);
+CREATE INDEX idx_document_type_order_bill ON order_bill(document_type, is_active);
+CREATE INDEX idx_document_number_order_bill ON order_bill(order_id, document_number);
 CREATE INDEX idx_carrier_delivery_tracking ON delivery_tracking(carrier_id, status);
 CREATE INDEX idx_status_delivery_tracking ON delivery_tracking(status);
 
