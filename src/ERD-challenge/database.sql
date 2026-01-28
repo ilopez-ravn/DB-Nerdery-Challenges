@@ -1,17 +1,29 @@
 -- USER DATA
 
+CREATE TYPE role_enum AS ENUM ('MANAGER', 'CLIENT', 'WAREHOUSE', 'SHIPPING');
 
-CREATE TABLE IF NOT EXISTS user_role (
+CREATE TABLE IF NOT EXISTS role (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
+    name role_enum NOT NULL,
     is_active BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE IF NOT EXISTS sys_user (
+CREATE TABLE IF NOT EXISTS person (
+    id SERIAL PRIMARY KEY,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    user_id INT REFERENCES system_user(id) ON DELETE SET NULL,
+    role_id INT REFERENCES role(id) ON DELETE RESTRICT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS system_user (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password TEXT NOT NULL,
-    role_id INT REFERENCES user_role(id) ON DELETE RESTRICT,
 
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -20,26 +32,22 @@ CREATE TABLE IF NOT EXISTS sys_user (
 
 CREATE TABLE IF NOT EXISTS user_refresh_token (
     id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES sys_user(id) ON DELETE CASCADE,
+    user_id INT REFERENCES system_user(id) ON DELETE CASCADE,
     refresh_token VARCHAR(255) UNIQUE NOT NULL,
     token_expiry TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     device_info JSON
 );
 
-
-CREATE TABLE IF NOT EXISTS employee_user (
+/*
+CREATE TABLE IF NOT EXISTS employee (
     id SERIAL PRIMARY KEY,
 
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    phone VARCHAR(20),
-
-    user_id INT REFERENCES sys_user(id) ON DELETE CASCADE,
+    person_id INT REFERENCES person(id) ON DELETE CASCADE,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+*/
 
 
 -- PRODUCT DATA
@@ -48,7 +56,7 @@ CREATE TABLE IF NOT EXISTS category (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    created_by INT REFERENCES sys_user(id) ON DELETE SET NULL,
+    created_by INT REFERENCES system_user(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -57,7 +65,7 @@ CREATE TABLE IF NOT EXISTS product (
     id SERIAL PRIMARY KEY,
     name VARCHAR(500) NOT NULL,
     description TEXT,
-    created_by INT REFERENCES sys_user(id) ON DELETE SET NULL,
+    created_by INT REFERENCES system_user(id) ON DELETE SET NULL,
     price DECIMAL(10, 2) NOT NULL,
     category_id INT REFERENCES category(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT TRUE,
@@ -84,7 +92,7 @@ CREATE TABLE IF NOT EXISTS product_changes_log (
     product_id INT REFERENCES product(id) ON DELETE CASCADE,
     change_description TEXT NOT NULL,
 
-    changed_by INT REFERENCES sys_user(id) ON DELETE SET NULL,
+    changed_by INT REFERENCES system_user(id) ON DELETE SET NULL,
     changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -96,7 +104,7 @@ CREATE TABLE IF NOT EXISTS product_image (
     is_primary_image BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
     
-    created_by INT REFERENCES sys_user(id) ON DELETE SET NULL,
+    created_by INT REFERENCES system_user(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -107,7 +115,7 @@ CREATE TABLE IF NOT EXISTS warehouse (
 
     is_active BOOLEAN DEFAULT TRUE,
 
-    created_by INT REFERENCES sys_user(id) ON DELETE SET NULL,
+    created_by INT REFERENCES system_user(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -121,46 +129,24 @@ CREATE TABLE IF NOT EXISTS product_stock (
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Keeps track of all stock changes per warehouse
-CREATE TABLE IF NOT EXISTS warehouse_kardex (
-    id SERIAL PRIMARY KEY,
-    product_id INT REFERENCES product(id) ON DELETE SET NULL,
-    warehouse_id INT REFERENCES warehouse(id) ON DELETE SET NULL,
-
-    change_type VARCHAR(50) NOT NULL,
-    reference_id INT, -- Keeps track of the related id (order_id, purchase_id, adjustment_id, etc)
-    quantity INT NOT NULL CHECK (quantity >= 0),
-    notes TEXT,
-
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
-
 
 -- CLIENT DATA
+/*
 
 CREATE TABLE IF NOT EXISTS client (
     id SERIAL PRIMARY KEY,
 
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) UNIQUE NOT NULL,
-    phone VARCHAR(20),
-    document VARCHAR(50) UNIQUE NOT NULL,
-    document_type VARCHAR(50) NOT NULL,
-
+    person_id INT REFERENCES person(id) ON DELETE CASCADE,
     
     google_id VARCHAR(255) UNIQUE,
-    user_id INT REFERENCES sys_user(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
+*/
 
 CREATE TABLE IF NOT EXISTS client_address (
     id SERIAL PRIMARY KEY,
-    client_id INT REFERENCES client(id) ON DELETE CASCADE,
+    client_id INT REFERENCES person(id) ON DELETE CASCADE,
     address_line1 VARCHAR(255) NOT NULL,
     address_line2 VARCHAR(255),
     city VARCHAR(100) NOT NULL,
@@ -175,7 +161,7 @@ CREATE TABLE IF NOT EXISTS client_address (
 
 CREATE TABLE IF NOT EXISTS shopping_cart (
     id SERIAL PRIMARY KEY,
-    client_id INT REFERENCES client(id) ON DELETE CASCADE,
+    client_id INT REFERENCES person(id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -196,14 +182,14 @@ CREATE TABLE IF NOT EXISTS shopping_cart_details (
 );
 
 CREATE TABLE IF NOT EXISTS product_liked (
-    client_id INT REFERENCES client(id) ON DELETE CASCADE,
+    client_id INT REFERENCES person(id) ON DELETE CASCADE,
     product_id INT REFERENCES product(id) ON DELETE CASCADE,
     liked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS order (
+CREATE TABLE IF NOT EXISTS sale_order (
     id SERIAL PRIMARY KEY,
-    client_id INT REFERENCES client(id) ON DELETE CASCADE,
+    client_id INT REFERENCES person(id) ON DELETE CASCADE,
     shopping_cart_id INT REFERENCES shopping_cart(id) ON DELETE SET NULL,
     warehouse_id INT REFERENCES warehouse(id) ON DELETE SET NULL,
     
@@ -213,7 +199,7 @@ CREATE TABLE IF NOT EXISTS order (
 
 CREATE TABLE IF NOT EXISTS order_bill (
     id SERIAL PRIMARY KEY,
-    order_id INT REFERENCES order(id) ON DELETE CASCADE NOT NULL,
+    order_id INT REFERENCES sale_order(id) ON DELETE CASCADE NOT NULL,
 
     document_type VARCHAR(50) NOT NULL,
     document_number VARCHAR(100) UNIQUE NOT NULL,
@@ -228,7 +214,7 @@ CREATE TABLE IF NOT EXISTS order_bill (
 
 CREATE TABLE IF NOT EXISTS order_details (
     id SERIAL PRIMARY KEY,
-    order_id INT REFERENCES order(id) ON DELETE CASCADE,
+    order_id INT REFERENCES sale_order(id) ON DELETE CASCADE,
     product_id INT REFERENCES product(id) ON DELETE CASCADE,
     price DECIMAL(10, 2) NOT NULL,
     quantity INT NOT NULL CHECK (quantity >= 0),
@@ -239,7 +225,7 @@ CREATE TABLE IF NOT EXISTS order_details (
 
 CREATE TABLE IF NOT EXISTS stripe_payment (
     id SERIAL PRIMARY KEY,
-    order_id INT REFERENCES order(id) ON DELETE CASCADE,
+    order_id INT REFERENCES sale_order(id) ON DELETE CASCADE,
     stripe_payment_id VARCHAR(255) UNIQUE NOT NULL,
     payment_type VARCHAR(50) NOT NULL,
     amount DECIMAL(10, 2) NOT NULL,
@@ -250,7 +236,7 @@ CREATE TABLE IF NOT EXISTS stripe_payment (
 
 CREATE TABLE IF NOT EXISTS stripe_customer_payment_method (
     id SERIAL PRIMARY KEY,
-    client_id INT REFERENCES client(id) ON DELETE CASCADE,
+    client_id INT REFERENCES person(id) ON DELETE CASCADE,
     stripe_customer_id VARCHAR(255) NOT NULL,
     stripe_payment_method_id VARCHAR(255) UNIQUE NOT NULL,
     is_default BOOLEAN DEFAULT FALSE,
@@ -274,15 +260,23 @@ CREAte TABLE IF NOT EXISTS carrier (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS delivery_status (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    step_order INT UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS delivery_tracking (
     id SERIAL PRIMARY KEY,
-    order_id INT REFERENCES order(id) ON DELETE CASCADE,
+    order_id INT REFERENCES sale_order(id) ON DELETE CASCADE,
     address_id INT REFERENCES client_address(id) ON DELETE SET NULL,
     tracking_number VARCHAR(100) UNIQUE NOT NULL,
     carrier_id INT REFERENCES carrier(id) ON DELETE SET NULL,
-    assigned_to INT REFERENCES sys_user(id) ON DELETE SET NULL,
+    assigned_to INT REFERENCES system_user(id) ON DELETE SET NULL,
 
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    status_id  INT REFERENCES delivery_status(id) ON DELETE SET NULL,
     estimated_delivery_date TIMESTAMP,
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -292,8 +286,8 @@ CREATE TABLE IF NOT EXISTS delivery_tracking (
 CREATE TABLE IF NOT EXISTS order_tracking_log (
     id SERIAL PRIMARY KEY,
     delivery_tracking_id INT REFERENCES delivery_tracking(id) ON DELETE CASCADE,
-    previous_status VARCHAR(50) NOT NULL,
-    new_status VARCHAR(50) NOT NULL,
+    previous_status_id INT REFERENCES delivery_status(id) ON DELETE SET NULL,
+    new_status_id INT REFERENCES delivery_status(id) ON DELETE SET NULL,
     
     changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -316,7 +310,7 @@ CREATE TABLE IF NOT EXISTS email_log (
 
 CREATE TABLE IF NOT EXISTS password_recovery_token (
     id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES sys_user(id) ON DELETE CASCADE,
+    user_id INT REFERENCES system_user(id) ON DELETE CASCADE,
     recovery_token VARCHAR(255) UNIQUE NOT NULL,
     token_expiry TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
