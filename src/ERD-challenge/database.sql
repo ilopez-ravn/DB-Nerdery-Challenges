@@ -3,7 +3,7 @@
 CREATE TYPE role_enum AS ENUM ('MANAGER', 'CLIENT', 'WAREHOUSE', 'SHIPPING');
 CREATE TYPE shopping_cart_status_enum AS ENUM ('ACTIVE', 'DELETED', 'PROCESSED');
 CREATE TYPE email_status_enum AS ENUM ('sent', 'not_sent');
-CREATE TYPE document_type_enum AS ENUM ('PERSON', 'BUSINESS');
+CREATE TYPE person_document_type_enum AS ENUM ('PERSON', 'BUSINESS');
 CREATE TYPE email_type_enum AS ENUM ('password_recovery', 'product_liked_alert');
 
 CREATE TABLE IF NOT EXISTS role (
@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS person (
     last_name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     phone VARCHAR(20),
+
+    document VARCHAR(20)
+    document_type
     
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -85,6 +88,8 @@ CREATE TABLE IF NOT EXISTS product (
 CREATE TABLE IF NOT EXISTS tag (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -236,7 +241,10 @@ CREATE TABLE IF NOT EXISTS stripe_payment (
     order_id INT REFERENCES sale_order(id) ON DELETE CASCADE,
     
     stripe_payment_id VARCHAR(255) UNIQUE NOT NULL,
-    payment_type VARCHAR(50) NOT NULL,
+    client_secret_key VARCHAR(255) NOT NULL,
+    
+    payment_method VARCHAR(100) NOT NULL,
+    payment_method_types JSON NOT NULL,
     amount DECIMAL(10, 2) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     payment_status VARCHAR(50) NOT NULL,
@@ -244,23 +252,11 @@ CREATE TABLE IF NOT EXISTS stripe_payment (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS stripe_customer_payment_method (
-    id SERIAL PRIMARY KEY,
-    client_id INT REFERENCES person(id) ON DELETE CASCADE,
-    
-    stripe_customer_id VARCHAR(255) NOT NULL,
-    stripe_payment_method_id VARCHAR(255) UNIQUE NOT NULL,
-
-    is_default BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE IF NOT EXISTS stripe_payment_event_log (
     id SERIAL PRIMARY KEY,
     payment_id INT REFERENCES stripe_payment(id) ON DELETE CASCADE,
     event_type VARCHAR(50) NOT NULL,
-    previous_status VARCHAR(50),
-    new_status VARCHAR(50),
+    status VARCHAR(50),
     event_data JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
